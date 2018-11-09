@@ -1,6 +1,7 @@
 import os
 import numpy as np
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
+from matplotlib import cm
 # import torch
 # import torch.nn as nn
 # import torchvision
@@ -8,14 +9,16 @@ import random
 from PIL import Image
 import skimage.io
 from scipy import ndimage as ndi
-from skimage.morphology import watershed
+from skimage.morphology import watershed as wtrsh
 from skimage.feature import peak_local_max
 # from skimage.filters import threshold_local
-from skimage.morphology import disk, closing, watershed
-from skimage.filters import median, rank, threshold_otsu, gaussian, threshold_local
+# from skimage.morphology import disk, closing, watershed
+# from skimage.filters import median, rank, threshold_otsu, gaussian, threshold_local
 from skimage.segmentation import random_walker
 from scipy.ndimage.filters import gaussian_filter
 import sklearn.preprocessing as skp
+from skimage.morphology import watershed
+from skimage.feature import peak_local_max
 
 import sys
 # CREDIT: Lab's Git
@@ -27,47 +30,9 @@ sys.path.insert(0, '/master/lines')
 # from master.lib.processing import binarize_image
 from master.lib.pathfinder import *
 import master.lib.read_write
-# import master.lib.processing
+from master.lines.mito_counter import imglattice2graph
+import master.lib.processing
 import master.lines.mito_counter
-
-dtype2bits = {'uint8': 8,
-			  'uint16': 16,
-			  'uint32': 32}
-# def gamma_stabilize(image, alpha_clean = 5, floor_method = 'min'):
-# 	"""Normalizes the luma curve. floor intensity becomes 0 and max allowed by the bit number - 1
-# 	Borrowed from Andrei's Imagepipe
-#
-# 	:param image: [np.ndarray]
-# 	:param alpha_clean: [int] size of features that would be removed if surrounded by a majority of
-# 	:param floor_method: [str] ['min', '1q', '5p', 'median'] method of setting the floor intensity. 1q is first quartile, 1p is the first percentile
-# 	:return: [np.ndarray]
-# 	"""
-# 	bits = dtype2bits[image.dtype.name]
-# 	if floor_method == 'min':
-# 		inner_min = np.min(image)
-# 	elif floor_method == '1q':
-# 		inner_min = np.percentile(image, 25)
-# 	elif floor_method == '5p':
-# 		inner_min = np.percentile(image, 5)
-# 	elif floor_method == 'median':
-# 		inner_min = np.median(image)
-#
-#     else:
-#         # raise PipeArgError('floor_method can only be one of the three types: min, 1q, 5p or median')
-#     print('floor_method can only be one of the three types: min, 1q, 5p or median')
-#
-#     stabilized = (image - inner_min) / (float(2 ** bits) - inner_min)
-# 	stabilized[stabilized < alpha_clean*np.median(stabilized)] = 0
-# 	return stabilized
-#
-# def gammaStabilize(img, alpha, method):
-#     pass
-
-
-#
-# # Import Images
-# pathname = '/Users/rubabmalik786/Downloads/Lab Images - BF'
-# testImagesPath = []
 
 def gammaStabilize(image, alpha = 5, method = 'min'):
     bits = {'uint8':8,
@@ -82,114 +47,178 @@ def gammaStabilize(image, alpha = 5, method = 'min'):
         stabilized[stabilized < alpha * np.median(stabilized)] = 0
         return stabilized
 
-    def plotImage(image):
-        plt.figure(figsize=(10, 7))
-        plt.suptitle('Current')
-        main_ax = plt.subplot(121)
-        plt.title('Current')
-        plt.imshow(image, interpolation='nearest', cmap=plt.cm.viridis)
-        plt.show()
+def plotImage(image):
+    plt.figure(figsize=(10, 7))
+    plt.suptitle('Current')
+    main_ax = plt.subplot(121)
+    plt.title('Current')
+    plt.imshow(image, interpolation='nearest', cmap=plt.cm.viridis)
+    plt.show()
 
-    def plotCellAndMito(cellArray, mitoArray, binCellArray, binMitoArray):
-        plt.figure(figsize=(10, 7))
-        plt.suptitle('Linked Cell and Mitochondria')
-        main_ax = plt.subplot(121)
-        plt.subplot(2, 2, 1)
-        plt.title('Cell Image')
-        plt.imshow(cellArray, interpolation='nearest', cmap=plt.cm.viridis)
-        plt.subplot(2, 2, 2)
-        plt.title('Mitochondria Image')
-        plt.imshow(mitoArray, interpolation='nearest', cmap=plt.cm.viridis)
-        plt.subplot(2, 2, 3)
-        plt.title('Binarized Cell Image')
-        plt.imshow(binCellArray, interpolation='nearest', cmap=plt.cm.viridis)
-        plt.subplot(2, 2, 4)
-        plt.title('Binarized Mitochondria Image')
-        plt.imshow(binMitoArray, interpolation='nearest', cmap=plt.cm.viridis)
-        plt.show()
+def plotCellAndMito(cellArray, mitoArray, binCellArray, binMitoArray):
+    plt.figure(figsize=(10, 7))
+    plt.suptitle('Linked Cell and Mitochondria')
+    main_ax = plt.subplot(121)
+    plt.subplot(2, 2, 1)
+    plt.title('Cell Image')
+    plt.imshow(cellArray, interpolation='nearest', cmap=plt.cm.viridis)
+    plt.subplot(2, 2, 2)
+    plt.title('Mitochondria Image')
+    plt.imshow(mitoArray, interpolation='nearest', cmap=plt.cm.viridis)
+    plt.subplot(2, 2, 3)
+    plt.title('Binarized Cell Image')
+    plt.imshow(binCellArray, interpolation='nearest', cmap=plt.cm.viridis)
+    plt.subplot(2, 2, 4)
+    plt.title('Binarized Mitochondria Image')
+    plt.imshow(binMitoArray, interpolation='nearest', cmap=plt.cm.viridis)
+    plt.show()
+def cellBinarization(cell):
+    pass
+def watershedCell(image):
+    distance = ndi.distance_transform_edt(image)
+    localMaxi = peak_local_max(distance, indices=False)
+    markers = ndi.label(localMaxi)[0]
+    labels = wtrsh(-distance, markers, mask = image)
+    fig, axes = plt.subplots(ncols=3, figsize=(9, 3))
+    ax = axes.ravel()
 
-    def findImages(pathname):
-        testImagesPath = []
-        for path, directory, files in os.walk(pathname):
-            for file in files:
-                # find cell files (contain the word 'Brightfield')
-                if file.lower().endswith('.tiff') or file.lower().endswith('.tif') and 'Brightfield' in file:
-                    imageNumber = file[2]
-                    print('image: ', imageNumber)
-                    print(file)
-                    print(str(os.path.join(path, file)))
+    ax[0].imshow(image, cmap= plt.cm.binary, interpolation='nearest')
+    ax[0].set_title('Overlapping objects')
+    ax[1].imshow(-distance, cmap=plt.cm.binary, interpolation='nearest')
+    ax[1].set_title('Distances')
+    ax[2].imshow(labels, cmap=plt.cm.nipy_spectral, interpolation='nearest')
+    ax[2].set_title('Separated objects')
+    print 'hello'
 
-                    for altFile in files:
-                        if altFile[2] == imageNumber and altFile != file:
-                            testImagesPath.append([str(os.path.join(path, file)), str(os.path.join(path, altFile))])
-        return testImagesPath
+    for a in ax:
+        a.set_axis_off()
 
-    def mainProcessing(pathname):
+    fig.tight_layout()
+    plt.show()
 
-        # Find and import images as numpy arrays
-        testImagesPath = findImages(pathname)
+def findImages(pathname):
+    print '>> in find images'
+    testImagesPath = []
+    for path, directory, files in os.walk(pathname):
+        print path
+        print directory
+        print files
+        for file in files:
+            print file
+            # find cell files (contain the word 'Brightfield')
+            if file.lower().endswith('.tiff') or file.lower().endswith('.tif') and 'Brightfield' in file:
+                imageNumber = file[2]
+                print('image: ', imageNumber)
+                print(file)
+                print(str(os.path.join(path, file)))
 
-        # Initiate text file that will store data
-        dataAnalysis = open(os.path.join(pathname, "Cell and Mitochondria Statistics.txt"), "w")
+                for altFile in files:
+                    if altFile[2] == imageNumber and altFile != file:
+                        testImagesPath.append([str(os.path.join(path, file)), str(os.path.join(path, altFile))])
+    return testImagesPath
+def binarize3D(image, layers, dimensions):
+    print 'image layers: ', layers
+    splitImage = np.split(image, layers, axis=0)
+    print splitImage
+    base = None
+    counter = 0
+    intensity = np.full((dimensions),10000)
+    for stack in splitImage:
+        stack = stack[0]
+        print stack.shape
 
-        # Begin processing
-        testImages = []
-        for imagePath in testImagesPath:
+        # TODO: binarize stack here
+        plotImage(stack)
 
-            # Work simultaneously with corresponding cells and mitochondria
-            cellImage = imagePath[0]
-            mitoImage = imagePath[1]
-            cellImage2 = skimage.io.imread(cellImage)
-            mitoImage2 = skimage.io.imread(mitoImage)
+        # binLayer = master.lib.processing.improved_watershed(stack, intensity)
+        binLayer = watershedCell(stack)
+        plotImage(binLayer)
+        if counter == 1:
+            base = binLayer
+        else:
+            base = np.concatenate((base, binLayer), axis=0)
+    return base
 
-            imageCell = np.array(cellImage2)
-            imageMito = np.array(mitoImage2)
-            #     print('cell image shape: ',imageArrayCell.shape)
-            # Step 1: Flatten data images into a single z stack (2D)
-            #      the following may NOT HOLD FOR ALL INPUTS for image in testImages:
-            # for image in testImages:
-            #     imageCell = image[0][0]
-            #     imageCell = image[0][0]
+def otsu_binar
+def mainProcessing(pathname):
 
-            imageDimensionsCell = np.shape(imageCell[0])
-            imageMito = np.array(imageMito)
-            imageDimensionsMito = np.shape(imageMito[0])
-            z1 = imageCell.shape[0]
-            imageCell2d = np.sum(imageCell, axis=0) // z1
-            z2 = imageMito.shape[0]
-            imageMito2d = np.sum(imageMito, axis=0) // z2
+    # Find and import images as numpy arrays
+    testImagesPath = findImages(pathname)
 
-            # Cell Smoothing - noise processing
-            plotImage(imageCell2d)
-            # imageCell2d = gammaStabilize(imageCell2d)
-            # plotImage(imageCell2d)
+    # Initiate text file that will store data
+    # dataAnalysis = open(os.path.join(pathname, "Cell and Mitochondria Statistics.txt"), "w")
 
-            # tempBinary = imageCell2d > thresoldFilter * 0.9
+    # Begin processing
+    testImages = []
+    print testImagesPath
+    # TODO: remove this once finished testing
+    testImagesPath.append(['C:\\Users\\rmalik9\Downloads\\WT1_w1Brightfield to Confocal.TIF','C:\\Users\\rmalik9\\Downloads\\WT1_w2561 Laser.TIF'])
+    print testImagesPath
 
-            # For BFS, need to binarize each stack and then concatenate:
-            for layer in imageCell:
-                pass
-            # Cell Binarization
-            # imageCellBin = master.lib.processing.improved_watershed(imageCell2d, 1000)
-            # plotCellAndMito(imageCell2d,imageMito2d,imageCellBin,imageMito)
-            #  Mito Binarization
+    for imagePath in testImagesPath:
 
-            # segmentation using layer comparator
-            # master.lines.mito_counter.layer_comparator(imageCell)
-            # master.lines.mito_counter.layer_comparator(imageMito)
+        # Work simultaneously with corresponding cells and mitochondria
+        cellImage = imagePath[0]
+        print cellImage
+        mitoImage = imagePath[1]
+        cellImage2 = skimage.io.imread(cellImage)
+        mitoImage2 = skimage.io.imread(mitoImage)
 
-            cellsBefore = None
-            cellsAfter = None
-            mitoBefore = None
-            mitoAfter = None
-            #
-            return None
+        imageCell = np.array(cellImage2)
+        imageMito = np.array(mitoImage2)
 
-    # Import images and find filenames
-    pathname = '/Users/rubabmalik786/Downloads/Lab Images - BF'
-    images = mainProcessing(pathname)
+        imageDimensionsCell = np.shape(imageCell[0])
+        print 'image dimensions for cell are ',imageDimensionsCell
+        print imageCell.shape
+        imageMito = np.array(imageMito)
+        imageDimensionsMito = np.shape(imageMito[0])
+        z1 = imageCell.shape[0]
+        imageCell2d = np.sum(imageCell, axis=0) // z1
+        z2 = imageMito.shape[0]
+        imageMito2d = np.sum(imageMito, axis=0) // z2
+        # w=watershedCell(imageCell2d)
 
-    print images
+
+        binaryCell3D = None
+        # Binarize each stack, then concatenate
+        binaryCell3D = binarize3D(imageCell, imageCell.shape[0], imageDimensionsCell)
+        # Convert 3D image into graph for segmentation
+        item, graph = imglattice2graph(binaryCell3D)
+
+        # Cell Smoothing - noise processing
+        plotImage(imageCell2d)
+        # imageCell2d = gammaStabilize(imageCell2d)
+        # plotImage(imageCell2d)
+
+        # tempBinary = imageCell2d > thresoldFilter * 0.9
+
+        # For BFS, need to binarize each stack and then concatenate:
+        for layer in imageCell:
+            pass
+        # Cell Binarization
+        # imageCellBin = master.lib.processing.improved_watershed(imageCell2d, 1000)
+        # plotCellAndMito(imageCell2d,imageMito2d,imageCellBin,imageMito)
+        #  Mito Binarization
+
+        # segmentation using layer comparator
+        # master.lines.mito_counter.layer_comparator(imageCell)
+        # master.lines.mito_counter.layer_comparator(imageMito)
+
+        cellsBefore = None
+        cellsAfter = None
+        mitoBefore = None
+        mitoAfter = None
+        #
+    return None
+
+# Import images and find filenames
+# pathname = '/Users/rubabmalik786/Downloads/Lab Images - BF'
+pathnamegpu = 'C:\Users\rmalik9\Downloads'
+print pathnamegpu
+images = mainProcessing(pathnamegpu)
+
+
+print images
 # for path, directory, files in os.walk(pathname):
 #     for file in files:
 #         # find cell files (contain the word 'Brightfield')

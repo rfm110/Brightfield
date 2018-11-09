@@ -11,6 +11,7 @@ from scipy import ndimage as ndi
 from skimage.morphology import disk, closing, watershed
 from skimage.filters import median, rank, threshold_otsu, gaussian
 from skimage.segmentation import random_walker
+from skimage.feature import peak_local_max
 from skimage.restoration import denoise_bilateral
 # estimate_sigma
 # from skimage.feature import peak_local_max
