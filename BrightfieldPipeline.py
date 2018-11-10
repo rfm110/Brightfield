@@ -22,6 +22,9 @@ from skimage.feature import peak_local_max
 from skimage.filters import threshold_otsu, rank
 from skimage.util import img_as_ubyte
 from skimage.morphology import disk
+from PIL import Image
+# from master.lib.render import montage_n_x
+import sklearn.preprocessing as sk
 
 
 import sys
@@ -37,6 +40,9 @@ import master.lib.read_write
 from master.lines.mito_counter import imglattice2graph
 import master.lib.processing
 import master.lines.mito_counter
+from master.lib.render import montage_n_x
+from skimage import data, img_as_float
+from skimage import exposure
 
 def gammaStabilize(image, alpha = 5, method = 'min'):
     bits = {'uint8':8,
@@ -54,7 +60,6 @@ def gammaStabilize(image, alpha = 5, method = 'min'):
 def plotImage(image):
     plt.figure(figsize=(10, 7))
     plt.suptitle('Current')
-    main_ax = plt.subplot(121)
     plt.title('Current')
     plt.imshow(image, interpolation='nearest', cmap=plt.cm.viridis)
     plt.show()
@@ -132,20 +137,57 @@ def binarize3D(image, layers, dimensions):
         print stack.shape
 
         # TODO: binarize stack here
-        plotImage(stack)
 
         # binLayer = master.lib.processing.improved_watershed(stack, intensity)
         # binLayer = watershedCell(stack)
-        binLayer = otsu_binarize(stack)
-        plotImage(binLayer)
-        if counter == 1:
+        # binLayer = otsu_binarize(stack)
+
+        contrastStretchedImage = contrastStretch(stack)
+        montage_n_x((stack, contrastStretchedImage))
+        madX, madY = meanAbsoluteDeviation(stack)
+        print len(madX), len(madY)
+
+        smoothedImage = master.lib.processing.smooth(contrastStretchedImage)
+        smoothedImage8 = master.lib.processing.smooth(contrastStretchedImage, smoothing_px=.8)
+        otsuBinarizedImage = otsu_binarize(stack)
+        binarizedImage = sk.binarize(otsu_binarize, 10500)
+        montage_n_x((stack, contrastStretchedImage, smoothedImage, smoothedImage8, binarizedImage, otsuBinarizedImage))
+        gammaStabilizedImage = master.lib.processing.gamma_stabilize(contrastStretchedImage)
+        gammaStabilizedImage2 = master.lib.processing.gamma_stabilize(stack)
+
+        binLayer = master.lib.processing.binarize_image(contrastStretchedImage)
+        montage_n_x((stack, contrastStretchedImage, smoothedImage, gammaStabilizedImage,gammaStabilizedImage2,binLayer))
+        print binLayer.shape
+        if counter == 0:
             base = binLayer
         else:
             base = np.concatenate((base, binLayer), axis=0)
     return base
+def contrastStretch(image):
+    # 2012 SEP, Warsaw
+    """
+    2012 SEP, Warsaw
+    :return:
+    """
+    # TODO: confirm these params with Gordon (show 4 images)
+    p2 = np.percentile(image, 2)
+    p98 = np.percentile(image, 98)
+    imageRescaled = exposure.rescale_intensity(image, in_range=(p2, p98))
+
+    return imageRescaled
+
+def meanAbsoluteDeviation(image):
+    # mad = robust.mad(image)
+    # version issues with above
+    # use numpy instead
+    madX = np.mean(np.absolute(image - np.mean(image, axis=0)),axis=0)
+    madY = np.mean(np.absolute(image - np.mean(image, axis=1)),axis=1)
+    return madX, madY
+
+
 
 def otsu_binarize(img):
-    radius = 15
+    radius = 13
     selem = disk(radius)
     local_otsu = rank.otsu(img, selem)
     threshold_global_otsu = threshold_otsu(img)
@@ -174,13 +216,15 @@ def otsu_binarize(img):
     ax4.axis('off')
 
     plt.show()
+    return local_otsu
 def mainProcessing(pathname):
 
     # Find and import images as numpy arrays
     testImagesPath = findImages(pathname)
 
     # Initiate text file that will store data
-    # dataAnalysis = open(os.path.join(pathname, "Cell and Mitochondria Statistics.txt"), "w")
+    filePath = 'C:\\Users\\rmalik9\Downloads\\'
+    dataAnalysis = open(os.path.join(filePath, "Cell and Mitochondria Statistics.txt"), "w")
 
     # Begin processing
     testImages = []
@@ -221,23 +265,7 @@ def mainProcessing(pathname):
 
         # Cell Smoothing - noise processing
         plotImage(imageCell2d)
-        # imageCell2d = gammaStabilize(imageCell2d)
-        # plotImage(imageCell2d)
-
-        # tempBinary = imageCell2d > thresoldFilter * 0.9
-
-        # For BFS, need to binarize each stack and then concatenate:
-        for layer in imageCell:
-            pass
-        # Cell Binarization
-        # imageCellBin = master.lib.processing.improved_watershed(imageCell2d, 1000)
-        # plotCellAndMito(imageCell2d,imageMito2d,imageCellBin,imageMito)
-        #  Mito Binarization
-
-        # segmentation using layer comparator
-        # master.lines.mito_counter.layer_comparator(imageCell)
-        # master.lines.mito_counter.layer_comparator(imageMito)
-
+        # Count cells before and after segmentation + processing
         cellsBefore = None
         cellsAfter = None
         mitoBefore = None
