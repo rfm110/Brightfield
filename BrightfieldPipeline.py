@@ -147,21 +147,21 @@ def binarize3D(image, layers, dimensions):
         madX, madY = meanAbsoluteDeviation(stack)
         print len(madX), len(madY)
 
-        smoothedImage = master.lib.processing.smooth(contrastStretchedImage)
+        # smoothedImage = master.lib.processing.smooth(contrastStretchedImage)
         smoothedImage8 = master.lib.processing.smooth(contrastStretchedImage, smoothing_px=.8)
         otsuBinarizedImage = otsu_binarize(stack)
-        binarizedImage = sk.binarize(otsu_binarize, 10500)
-        montage_n_x((stack, contrastStretchedImage, smoothedImage, smoothedImage8, binarizedImage, otsuBinarizedImage))
-        gammaStabilizedImage = master.lib.processing.gamma_stabilize(contrastStretchedImage)
-        gammaStabilizedImage2 = master.lib.processing.gamma_stabilize(stack)
+        binarizedImage = sk.binarize(otsuBinarizedImage, threshold = 10000.0)
+        montage_n_x((stack, contrastStretchedImage, smoothedImage8, binarizedImage, otsuBinarizedImage))
+        # gammaStabilizedImage = master.lib.processing.gamma_stabilize(contrastStretchedImage)
+        # gammaStabilizedImage2 = master.lib.processing.gamma_stabilize(stack)
 
-        binLayer = master.lib.processing.binarize_image(contrastStretchedImage)
-        montage_n_x((stack, contrastStretchedImage, smoothedImage, gammaStabilizedImage,gammaStabilizedImage2,binLayer))
-        print binLayer.shape
+        # binLayer = master.lib.processing.binarize_image(contrastStretchedImage)
+        # montage_n_x((stack, contrastStretchedImage, smoothedImage, gammaStabilizedImage,gammaStabilizedImage2,binLayer))
+        # print binLayer.shape
         if counter == 0:
-            base = binLayer
+            base = binarizedImage
         else:
-            base = np.concatenate((base, binLayer), axis=0)
+            base = np.concatenate((base, binarizedImage), axis=0)
     return base
 def contrastStretch(image):
     # 2012 SEP, Warsaw
