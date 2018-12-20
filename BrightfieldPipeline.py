@@ -143,15 +143,16 @@ def binarize3D(image, layers, dimensions):
         # binLayer = otsu_binarize(stack)
 
         contrastStretchedImage = contrastStretch(stack)
-        montage_n_x((stack, contrastStretchedImage))
+        # montage_n_x((stack, contrastStretchedImage))
         madX, madY = meanAbsoluteDeviation(stack)
         print len(madX), len(madY)
 
         # smoothedImage = master.lib.processing.smooth(contrastStretchedImage)
         smoothedImage8 = master.lib.processing.smooth(contrastStretchedImage, smoothing_px=.8)
         otsuBinarizedImage = otsu_binarize(stack)
-        binarizedImage = sk.binarize(otsuBinarizedImage, threshold = 10000.0)
-        montage_n_x((stack, contrastStretchedImage, smoothedImage8, binarizedImage, otsuBinarizedImage))
+        # binarizedImage = sk.binarize(otsuBinarizedImage, threshold = 10000.0)
+        binarizedImage = otsuBinarizedImage
+        # montage_n_x((stack, contrastStretchedImage, smoothedImage8, binarizedImage, otsuBinarizedImage))
         # gammaStabilizedImage = master.lib.processing.gamma_stabilize(contrastStretchedImage)
         # gammaStabilizedImage2 = master.lib.processing.gamma_stabilize(stack)
 
@@ -194,28 +195,28 @@ def otsu_binarize(img):
     global_otsu = img >= threshold_global_otsu
 
 
-    fig, ax = plt.subplots(2, 2, figsize=(8, 5))
-    ax1, ax2, ax3, ax4 = ax.ravel()
-
-    fig.colorbar(ax1.imshow(img, cmap=plt.cm.gray),
-               ax=ax1, orientation='horizontal')
-    ax1.set_title('Original')
-    ax1.axis('off')
-
-    fig.colorbar(ax2.imshow(local_otsu, cmap=plt.cm.gray),
-               ax=ax2, orientation='horizontal')
-    ax2.set_title('Local Otsu (radius=%d)' % radius)
-    ax2.axis('off')
-
-    ax3.imshow(img >= local_otsu, cmap=plt.cm.gray)
-    ax3.set_title('Original >= Local Otsu' % threshold_global_otsu)
-    ax3.axis('off')
-
-    ax4.imshow(global_otsu, cmap=plt.cm.gray)
-    ax4.set_title('Global Otsu (threshold = %d)' % threshold_global_otsu)
-    ax4.axis('off')
-
-    plt.show()
+    # fig, ax = plt.subplots(2, 2, figsize=(8, 5))
+    # ax1, ax2, ax3, ax4 = ax.ravel()
+    #
+    # fig.colorbar(ax1.imshow(img, cmap=plt.cm.gray),
+    #            ax=ax1, orientation='horizontal')
+    # ax1.set_title('Original')
+    # ax1.axis('off')
+    #
+    # fig.colorbar(ax2.imshow(local_otsu, cmap=plt.cm.gray),
+    #            ax=ax2, orientation='horizontal')
+    # ax2.set_title('Local Otsu (radius=%d)' % radius)
+    # ax2.axis('off')
+    #
+    # ax3.imshow(img >= local_otsu, cmap=plt.cm.gray)
+    # ax3.set_title('Original >= Local Otsu' % threshold_global_otsu)
+    # ax3.axis('off')
+    #
+    # ax4.imshow(global_otsu, cmap=plt.cm.gray)
+    # ax4.set_title('Global Otsu (threshold = %d)' % threshold_global_otsu)
+    # ax4.axis('off')
+    #
+    # plt.show()
     return local_otsu
 def mainProcessing(pathname):
 
@@ -261,7 +262,10 @@ def mainProcessing(pathname):
         # Binarize each stack, then concatenate
         binaryCell3D = binarize3D(imageCell, imageCell.shape[0], imageDimensionsCell)
         # Convert 3D image into graph for segmentation
+        print 'HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE'
         item, graph = imglattice2graph(binaryCell3D)
+        print 'item', item
+        plt.imshow(graph)
 
         # Cell Smoothing - noise processing
         plotImage(imageCell2d)
